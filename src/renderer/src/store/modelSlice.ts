@@ -26,6 +26,14 @@ const defaultModels: AIModel[] = [
     pricing: { input: 0.00015, output: 0.0006 },
   },
   {
+    id: "gpt-5",
+    name: "GPT-5",
+    providerId: "openai",
+    contextLength: 200000,
+    maxTokens: 8192,
+    pricing: { input: 0.01, output: 0.03 },
+  },
+  {
     id: "claude-3-5-sonnet-20241022",
     name: "Claude 3.5 Sonnet",
     providerId: "anthropic",

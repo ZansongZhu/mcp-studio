@@ -1,7 +1,7 @@
 import Store from "electron-store";
 import { ModelProvider, MCPServer } from "@shared/types";
 import { app } from "electron";
-import { join, resolve } from "path";
+import { join } from "path";
 import { readFileSync, existsSync } from "fs";
 import { homedir } from "os";
 

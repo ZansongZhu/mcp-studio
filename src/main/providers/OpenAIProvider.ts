@@ -18,18 +18,39 @@ export class OpenAIProvider extends BaseProvider {
     const OpenAI = require("openai");
     const client = new OpenAI(this.getBaseConfig());
 
-    return await this.withRetry(async () => {
-      const completion = await client.chat.completions.create({
-        model,
-        messages,
-        max_tokens: maxTokens,
-        temperature: 0.7,
-      });
+    try {
+      return await this.withRetry(async () => {
+        // Use max_completion_tokens for GPT-5 models, max_tokens for others
+        // GPT-5 only supports default temperature (1), not 0.7
+        const isGPT5 = model.includes('gpt-5');
+        const tokenParam = isGPT5 ? 'max_completion_tokens' : 'max_tokens';
+        const requestBody: any = {
+          model,
+          messages,
+        };
+        
+        // Only set temperature for non-GPT-5 models
+        if (!isGPT5) {
+          requestBody.temperature = 0.7;
+        }
+        
+        if (maxTokens) {
+          requestBody[tokenParam] = maxTokens;
+        }
 
-      const response = completion.choices[0]?.message?.content || "";
-      this.logProviderSuccess('openai', model, response.length);
-      return response;
-    });
+        const completion = await client.chat.completions.create(requestBody);
+
+        const response = completion.choices[0]?.message?.content || "";
+        this.logProviderSuccess('openai', model, response.length);
+        return response;
+      });
+    } catch (error) {
+      this.logProviderError('openai', model, error as Error);
+      // Return the error as the response content so it appears in the chat
+      const errorMessage = `❌ OpenAI Error: ${(error as any).message}`;
+      console.log(`🔴 [OPENAI] Returning error as response: ${errorMessage}`);
+      return errorMessage;
+    }
   }
 
   async generateResponseWithTools(
@@ -62,14 +83,27 @@ export class OpenAIProvider extends BaseProvider {
 
         console.log(`🔧 [OPENAI] Prepared ${functions.length} functions`);
 
-        const completion = await client.chat.completions.create({
+        // Use max_completion_tokens for GPT-5 models, max_tokens for others
+        // GPT-5 only supports default temperature (1), not 0.7
+        const isGPT5 = model.includes('gpt-5');
+        const tokenParam = isGPT5 ? 'max_completion_tokens' : 'max_tokens';
+        const requestBody: any = {
           model,
           messages,
-          max_tokens: maxTokens,
-          temperature: 0.7,
           tools: functions,
           tool_choice: "auto",
-        });
+        };
+        
+        // Only set temperature for non-GPT-5 models
+        if (!isGPT5) {
+          requestBody.temperature = 0.7;
+        }
+        
+        if (maxTokens) {
+          requestBody[tokenParam] = maxTokens;
+        }
+
+        const completion = await client.chat.completions.create(requestBody);
 
         const choice = completion.choices[0];
         const message = choice?.message;
@@ -140,12 +174,25 @@ export class OpenAIProvider extends BaseProvider {
             })),
           ];
 
-          const followUpCompletion = await client.chat.completions.create({
+          // Use max_completion_tokens for GPT-5 models, max_tokens for others
+          // GPT-5 only supports default temperature (1), not 0.7
+          const isGPT5 = model.includes('gpt-5');
+          const tokenParam = isGPT5 ? 'max_completion_tokens' : 'max_tokens';
+          const followUpRequestBody: any = {
             model,
             messages: toolResultMessages,
-            max_tokens: maxTokens,
-            temperature: 0.7,
-          });
+          };
+          
+          // Only set temperature for non-GPT-5 models
+          if (!isGPT5) {
+            followUpRequestBody.temperature = 0.7;
+          }
+          
+          if (maxTokens) {
+            followUpRequestBody[tokenParam] = maxTokens;
+          }
+
+          const followUpCompletion = await client.chat.completions.create(followUpRequestBody);
 
           finalResponse =
             followUpCompletion.choices[0]?.message?.content || finalResponse;
@@ -162,9 +209,13 @@ export class OpenAIProvider extends BaseProvider {
       });
     } catch (error) {
       this.logProviderError('openai', model, error as Error);
+      // Return the error as the response content so it appears in the chat
+      const errorMessage = `❌ OpenAI Error: ${(error as any).message}`;
+      console.log(`🔴 [OPENAI] Returning error as response: ${errorMessage}`);
       return {
-        success: false,
-        error: `OpenAI API error: ${(error as any).message}`,
+        success: true,
+        response: errorMessage,
+        toolCalls: [],
       };
     }
   }
