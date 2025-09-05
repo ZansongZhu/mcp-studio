@@ -12,7 +12,7 @@ export class OllamaProvider extends BaseProvider {
     maxTokens?: number
   ): Promise<string> {
     // Always use the provider's default model for Ollama
-    const actualModel = this.provider?.defaultModel || 'llama3.2';
+    const actualModel = this.provider?.defaultModel || 'ollama';
     
     console.log(`[OllamaProvider] DEBUG: Provider config:`, {
       providerId: this.provider?.id,

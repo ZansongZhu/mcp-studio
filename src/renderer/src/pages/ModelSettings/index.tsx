@@ -415,7 +415,7 @@ const ModelSettingsPage: React.FC = () => {
                     }
                   ]}
                 >
-                  <Input placeholder="llama3.2" />
+                  <Input placeholder="model-name" />
                 </Form.Item>
               ) : null;
             }}

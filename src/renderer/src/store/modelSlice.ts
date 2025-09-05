@@ -148,7 +148,7 @@ const defaultProviders: ModelProvider[] = [
     baseUrl: "http://localhost:11434",
     apiKey: "",
     models: defaultModels.filter((m) => m.providerId === "ollama"),
-    defaultModel: "llama3.2",
+    defaultModel: "ollama",
   },
 ];
 

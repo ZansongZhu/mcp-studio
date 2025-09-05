@@ -95,13 +95,6 @@ const getDefaultProviders = (): ModelProvider[] => {
       maxTokens: 8192,
       pricing: { input: 0.000075, output: 0.0003 },
     },
-    {
-      id: "llama3.2",
-      name: "Llama 3.2",
-      providerId: "ollama",
-      contextLength: 32768,
-      maxTokens: 2048,
-    },
   ];
 
   return [
@@ -212,6 +205,14 @@ const AppInitializer: React.FC = () => {
         console.log(`Adding missing default provider: ${defaultProvider.name}`);
         merged.push(defaultProvider);
       } else {
+        // Remove obsolete models (like llama3.2)
+        const obsoleteModelIds = ['llama3.2'];
+        const originalCount = existingProvider.models.length;
+        existingProvider.models = existingProvider.models.filter(model => !obsoleteModelIds.includes(model.id));
+        if (existingProvider.models.length < originalCount) {
+          console.log(`Removed obsolete models from ${existingProvider.name}`);
+        }
+        
         // Update existing provider with new models from defaults
         const existingModelIds = new Set(existingProvider.models.map(m => m.id));
         const newModels = defaultProvider.models.filter(model => !existingModelIds.has(model.id));
