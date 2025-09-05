@@ -24,6 +24,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
     filteredTemplates,
     selectedPromptChips,
     showPromptDropdown,
+    selectedIndex,
     handleInputChange,
     handleSelectTemplate,
     handleRemoveChip,
@@ -56,9 +57,12 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const handleKeyDownInternal = (e: React.KeyboardEvent) => {
     const result = handleKeyDown(e, handleSendInternal);
     
-    if (result?.selectFirstTemplate && filteredTemplates.length > 0) {
-      const newValue = handleSelectTemplate(filteredTemplates[0], inputValue, textAreaRef);
-      setInputValue(newValue);
+    if (result?.selectTemplateAtIndex !== undefined && filteredTemplates.length > 0) {
+      const template = filteredTemplates[result.selectTemplateAtIndex];
+      if (template) {
+        const newValue = handleSelectTemplate(template, inputValue, textAreaRef);
+        setInputValue(newValue);
+      }
     }
   };
 
@@ -92,10 +96,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
       {showPromptDropdown && (
         <PromptDropdown>
           {filteredTemplates.length > 0 ? (
-            filteredTemplates.map((template) => (
+            filteredTemplates.map((template, index) => (
               <PromptItem
                 key={template.id}
                 onClick={() => handleTemplateSelect(template)}
+                $isSelected={index === selectedIndex}
               >
                 <PromptItemName>
                   {template.shortKey && (
@@ -162,18 +167,19 @@ const PromptDropdown = styled.div`
   z-index: 1000;
 `;
 
-const PromptItem = styled.div`
+const PromptItem = styled.div<{ $isSelected?: boolean }>`
   padding: 12px 16px;
   cursor: pointer;
   border-bottom: 1px solid #f0f0f0;
   transition: background-color 0.2s;
+  background-color: ${props => props.$isSelected ? '#e6f7ff' : 'transparent'};
 
   &:last-child {
     border-bottom: none;
   }
 
   &:hover {
-    background-color: #f5f5f5;
+    background-color: ${props => props.$isSelected ? '#bae7ff' : '#f5f5f5'};
   }
 `;
 

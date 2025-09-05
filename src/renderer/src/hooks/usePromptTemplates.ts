@@ -6,6 +6,7 @@ export const usePromptTemplates = () => {
   const [selectedPromptChips, setSelectedPromptChips] = useState<any[]>([]);
   const [showPromptDropdown, setShowPromptDropdown] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Load prompt templates on mount
   useEffect(() => {
@@ -44,9 +45,11 @@ export const usePromptTemplates = () => {
 
         setFilteredTemplates(filtered);
         setShowPromptDropdown(filtered.length > 0);
+        setSelectedIndex(0); // Reset selection when filtering
       } else {
         setShowPromptDropdown(false);
         setFilteredTemplates([]);
+        setSelectedIndex(0);
       }
     },
     [promptTemplates]
@@ -116,9 +119,9 @@ export const usePromptTemplates = () => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (showPromptDropdown) {
-          // If dropdown is open, select first template or close if none
+          // If dropdown is open, select the currently highlighted template
           if (filteredTemplates.length > 0) {
-            return { selectFirstTemplate: true };
+            return { selectTemplateAtIndex: selectedIndex };
           } else {
             setShowPromptDropdown(false);
           }
@@ -127,20 +130,26 @@ export const usePromptTemplates = () => {
         }
         return undefined;
       } else if (e.key === "Escape" && showPromptDropdown) {
-        setShowPromptDropdown(false);
-        return undefined;
-      } else if (
-        e.key === "ArrowDown" &&
-        showPromptDropdown &&
-        filteredTemplates.length > 0
-      ) {
         e.preventDefault();
-        // Handle arrow navigation if needed later
+        setShowPromptDropdown(false);
+        setSelectedIndex(0);
+        return undefined;
+      } else if (e.key === "ArrowDown" && showPromptDropdown) {
+        e.preventDefault();
+        if (filteredTemplates.length > 0) {
+          setSelectedIndex((prev) => (prev + 1) % filteredTemplates.length);
+        }
+        return undefined;
+      } else if (e.key === "ArrowUp" && showPromptDropdown) {
+        e.preventDefault();
+        if (filteredTemplates.length > 0) {
+          setSelectedIndex((prev) => (prev - 1 + filteredTemplates.length) % filteredTemplates.length);
+        }
         return undefined;
       }
       return undefined;
     },
-    [showPromptDropdown, filteredTemplates]
+    [showPromptDropdown, filteredTemplates, selectedIndex]
   );
 
   return {
@@ -149,6 +158,7 @@ export const usePromptTemplates = () => {
     selectedPromptChips,
     showPromptDropdown,
     cursorPosition,
+    selectedIndex,
     handleInputChange,
     handleSelectTemplate,
     handleRemoveChip,
