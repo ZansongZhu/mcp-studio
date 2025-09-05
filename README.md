@@ -6,10 +6,13 @@ A minimal desktop application for working with Model Context Protocol (MCP) serv
 
 ## Features
 
-- 🤖 **AI Assistant**: Chat with AI models using a clean interface
-- 🔧 **MCP Integration**: Connect to and manage MCP servers
-- ⚙️ **Model Management**: Configure multiple AI providers and models
-- 🖥️ **Desktop App**: Cross-platform Electron application
+- 🤖 **Multi-Provider AI Support**: Chat with AI models from Anthropic Claude, OpenAI, Google Gemini, and Mistral
+- 🔧 **MCP Server Management**: Connect to stdio, SSE, and HTTP-based MCP servers with health monitoring
+- 📝 **Prompt Templates**: Create and manage reusable prompt templates with quick-access shortcuts
+- 🛠️ **Interactive Tool Execution**: Real-time MCP tool execution with abort capability and error handling
+- 💾 **Conversation Persistence**: Maintain chat history and conversation data across sessions
+- 🔐 **Secure Credential Management**: Safe storage of API keys and sensitive configuration
+- 🖥️ **Cross-Platform Desktop**: Native builds for Windows, macOS, and Linux
 
 ## Getting Started
 
@@ -23,7 +26,7 @@ A minimal desktop application for working with Model Context Protocol (MCP) serv
 1. Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/ZansongZhu/mcp-studio.git
 cd mcp-studio
 ```
 
@@ -126,6 +129,14 @@ The chat interface provides real-time tool execution feedback and maintains conv
 **Helpful Tips:**
 - Type "What available tools?" or key in `/tools` to show all tools available in this session
 - Use your prompt templates in the message box by typing "/" followed by your template's short key
+
+## MCP Resources
+
+Discover more MCP servers and tools to enhance your experience:
+
+- **[mcp.so](https://mcp.so)** - Comprehensive directory of MCP servers and resources
+- **[Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers)** - Curated list of community MCP servers
+- **[Official MCP Servers](https://github.com/modelcontextprotocol/servers)** - Official Model Context Protocol server implementations
 
 ## Architecture
 
