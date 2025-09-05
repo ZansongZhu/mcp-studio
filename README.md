@@ -6,7 +6,7 @@ A minimal desktop application for working with Model Context Protocol (MCP) serv
 
 ## Features
 
-- 🤖 **Multi-Provider AI Support**: Chat with AI models from Anthropic Claude, OpenAI, Google Gemini, DeepSeek and Qwen
+- 🤖 **Multi-Provider AI Support**: Chat with AI models from Anthropic Claude, OpenAI, Google Gemini, DeepSeek, Qwen and Ollama.
 - 🔧 **MCP Server Management**: Connect to stdio, SSE, and HTTP-based MCP servers with health monitoring
 - 📝 **Prompt Templates**: Create and manage reusable prompt templates with quick-access shortcuts
 - 🛠️ **Interactive Tool Execution**: Real-time MCP tool execution with abort capability and error handling
