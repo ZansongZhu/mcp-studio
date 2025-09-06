@@ -1,13 +1,14 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useEffect } from "react";
 import { Button, Input, Space } from "antd";
-import { Send } from "lucide-react";
+import { Send, Bot } from "lucide-react";
 import styled from "styled-components";
 import { usePromptTemplates } from "../../hooks/usePromptTemplates";
+import { useAgentMentions } from "../../hooks/useAgentMentions";
 
 const { TextArea } = Input;
 
 interface MessageInputProps {
-  onSendMessage: (message: string) => Promise<any>;
+  onSendMessage: (message: string, mentionedAgent?: any, mentionedAgents?: any[]) => Promise<any>;
   disabled?: boolean;
   loading?: boolean;
 }
@@ -17,48 +18,100 @@ const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   loading = false,
 }) => {
-  const [inputValue, setInputValue] = useState("");
   const textAreaRef = useRef<any>(null);
 
   const {
     filteredTemplates,
     selectedPromptChips,
     showPromptDropdown,
-    selectedIndex,
-    handleInputChange,
+    selectedIndex: promptSelectedIndex,
+    handleInputChange: handlePromptInputChange,
     handleSelectTemplate,
     handleRemoveChip,
     buildMessageContent,
     clearChips,
-    handleKeyDown,
+    handleKeyDown: handlePromptKeyDown,
   } = usePromptTemplates();
+
+  const {
+    inputValue,
+    setInputValue,
+    filteredAgents,
+    showAgentDropdown,
+    selectedIndex: agentSelectedIndex,
+    handleInputChange: handleAgentInputChange,
+    handleSelectAgent,
+    getMentionedAgent,
+    getMentionedAgents,
+    handleKeyDown: handleAgentKeyDown,
+    clearState: clearAgentState
+  } = useAgentMentions();
+
+  // Auto-focus input when loading changes from true to false (assistant finishes responding)
+  const prevLoadingRef = useRef(loading);
+  useEffect(() => {
+    if (prevLoadingRef.current === true && loading === false) {
+      // Assistant just finished responding, focus the input
+      setTimeout(() => {
+        if (textAreaRef.current) {
+          textAreaRef.current.focus();
+        }
+      }, 100); // Small delay to ensure UI has updated
+    }
+    prevLoadingRef.current = loading;
+  }, [loading]);
 
   const handleInputChangeInternal = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
-    setInputValue(value);
-    
     const cursor = e.target.selectionStart;
-    handleInputChange(value, cursor);
+    
+    // Handle both prompt and agent input changes
+    handlePromptInputChange(value, cursor);
+    handleAgentInputChange(value, cursor);
   };
 
   const handleSendInternal = async () => {
     const messageContent = buildMessageContent(inputValue);
     if (!messageContent.trim()) return;
 
-    const result = await onSendMessage(messageContent);
+    console.log("📝 [MESSAGE_INPUT] Message content:", messageContent);
+    console.log("📝 [MESSAGE_INPUT] Input value:", inputValue);
+
+    // Check if there are mentioned agents (single or multiple)
+    console.log("📝 [MESSAGE_INPUT] Message content to parse:", messageContent);
+    const mentionedAgent = getMentionedAgent(messageContent); // For backward compatibility
+    const mentionedAgents = getMentionedAgents(messageContent); // For multi-agent support
+    console.log("📝 [MESSAGE_INPUT] Mentioned agent:", mentionedAgent);
+    console.log("📝 [MESSAGE_INPUT] All mentioned agents:", mentionedAgents);
+    console.log("📝 [MESSAGE_INPUT] Type check - mentionedAgents is:", typeof mentionedAgents, Array.isArray(mentionedAgents));
+    
+    const result = await onSendMessage(messageContent, mentionedAgent, mentionedAgents);
+    console.log("📝 [MESSAGE_INPUT] Send result:", result);
     
     // Only clear input and chips if message was sent successfully
     if (result && !result.isToolsCommand) {
-      setInputValue("");
       clearChips();
+      clearAgentState();
     }
   };
 
   const handleKeyDownInternal = (e: React.KeyboardEvent) => {
-    const result = handleKeyDown(e, handleSendInternal);
-    
-    if (result?.selectTemplateAtIndex !== undefined && filteredTemplates.length > 0) {
-      const template = filteredTemplates[result.selectTemplateAtIndex];
+    // First check agent mentions (higher priority)
+    const agentResult = handleAgentKeyDown(e, handleSendInternal);
+    if (agentResult.preventDefault) {
+      if (agentResult.selectAgentAtIndex !== undefined && filteredAgents.length > 0) {
+        const agent = filteredAgents[agentResult.selectAgentAtIndex];
+        if (agent) {
+          handleSelectAgent(agent, textAreaRef);
+        }
+      }
+      return;
+    }
+
+    // Then check prompt templates
+    const promptResult = handlePromptKeyDown(e, handleSendInternal);
+    if (promptResult?.selectTemplateAtIndex !== undefined && filteredTemplates.length > 0) {
+      const template = filteredTemplates[promptResult.selectTemplateAtIndex];
       if (template) {
         const newValue = handleSelectTemplate(template, inputValue, textAreaRef);
         setInputValue(newValue);
@@ -71,6 +124,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
     setInputValue(newValue);
   };
 
+  const handleAgentSelect = (agent: any) => {
+    handleSelectAgent(agent, textAreaRef);
+  };
+
   return (
     <InputContainer>
       <Space.Compact style={{ width: "100%" }}>
@@ -79,7 +136,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           value={inputValue}
           onChange={handleInputChangeInternal}
           onKeyDown={handleKeyDownInternal}
-          placeholder="Type your message... (use /[short key] to insert templates)"
+          placeholder="Type your message... (use @ to mention agents, /[short key] for templates)"
           autoSize={{ minRows: 1, maxRows: 4 }}
           style={{ resize: "none" }}
           disabled={disabled}
@@ -93,6 +150,32 @@ const MessageInput: React.FC<MessageInputProps> = ({
         />
       </Space.Compact>
 
+      {showAgentDropdown && (
+        <AgentDropdown>
+          {filteredAgents.length > 0 ? (
+            filteredAgents.map((agent, index) => (
+              <AgentItem
+                key={agent.id}
+                onClick={() => handleAgentSelect(agent)}
+                $isSelected={index === agentSelectedIndex}
+              >
+                <AgentItemContent>
+                  <Bot size={16} />
+                  <AgentItemName>@{agent.name}</AgentItemName>
+                </AgentItemContent>
+                {agent.description && (
+                  <AgentItemDesc>{agent.description}</AgentItemDesc>
+                )}
+              </AgentItem>
+            ))
+          ) : (
+            <AgentEmptyState>
+              No agents found. Create one in Agents page.
+            </AgentEmptyState>
+          )}
+        </AgentDropdown>
+      )}
+
       {showPromptDropdown && (
         <PromptDropdown>
           {filteredTemplates.length > 0 ? (
@@ -100,7 +183,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
               <PromptItem
                 key={template.id}
                 onClick={() => handleTemplateSelect(template)}
-                $isSelected={index === selectedIndex}
+                $isSelected={index === promptSelectedIndex}
               >
                 <PromptItemName>
                   {template.shortKey && (
@@ -152,6 +235,21 @@ const InputContainer = styled.div`
   position: relative;
 `;
 
+const AgentDropdown = styled.div`
+  position: absolute;
+  bottom: 100%;
+  left: 24px;
+  right: 24px;
+  margin-bottom: 8px;
+  background: white;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1001;
+`;
+
 const PromptDropdown = styled.div`
   position: absolute;
   bottom: 100%;
@@ -165,6 +263,49 @@ const PromptDropdown = styled.div`
   max-height: 300px;
   overflow-y: auto;
   z-index: 1000;
+`;
+
+const AgentItem = styled.div<{ $isSelected?: boolean }>`
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+  background-color: ${props => props.$isSelected ? '#f6ffed' : 'transparent'};
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: ${props => props.$isSelected ? '#d9f7be' : '#f5f5f5'};
+  }
+`;
+
+const AgentItemContent = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+`;
+
+const AgentItemName = styled.div`
+  font-weight: 500;
+  font-size: 14px;
+  color: #52c41a;
+`;
+
+const AgentItemDesc = styled.div`
+  font-size: 12px;
+  color: #666;
+  opacity: 0.8;
+  margin-left: 24px;
+`;
+
+const AgentEmptyState = styled.div`
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
 `;
 
 const PromptItem = styled.div<{ $isSelected?: boolean }>`

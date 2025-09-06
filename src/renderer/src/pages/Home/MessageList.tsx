@@ -118,18 +118,23 @@ const ChartRenderer: React.FC<{ content: string }> = ({ content }) => {
   return null;
 };
 
-// Simple text renderer that handles charts but not markdown
+// Simple text renderer that handles charts and agent mentions
 const SimpleContentRenderer: React.FC<{ content: string }> = ({ content }) => {
   const hasChart = /```chart\s*\n([\s\S]*?)\n```/g.test(content);
   
   // Remove chart blocks from text content
-  const textContent = content.replace(/```chart\s*\n([\s\S]*?)\n```/g, "");
+  let textContent = content.replace(/```chart\s*\n([\s\S]*?)\n```/g, "");
+  
+  // Render text without agent mention highlighting
+  const renderTextWithMentions = (text: string) => {
+    return text;
+  };
 
   return (
     <>
       {hasChart && <ChartRenderer content={content} />}
       <div style={{ whiteSpace: "pre-wrap", wordWrap: "break-word" }}>
-        {textContent}
+        {renderTextWithMentions(textContent)}
       </div>
     </>
   );
@@ -145,6 +150,7 @@ const MessageList: React.FC<MessageListProps> = ({ conversation }) => {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const messages = useSelector((state: RootState) => selectConversationMessages(state, conversation.id));
   const allToolCalls = useSelector(selectAllToolCalls);
+  const agents = useSelector((state: RootState) => state.agent.agents);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -155,6 +161,30 @@ const MessageList: React.FC<MessageListProps> = ({ conversation }) => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const getSenderName = (message: Message) => {
+    if (message.role === "user") return "You";
+    if (message.role === "system") return "System";
+    
+    // For assistant messages, check for multiple agents first
+    if (message.agentIds && message.agentIds.length > 1) {
+      const agentNames = message.agentIds
+        .map(id => agents.find(a => a.id === id)?.name)
+        .filter(name => name)
+        .join(" & ");
+      return agentNames || "Multiple Agents";
+    }
+    
+    // For assistant messages, check if we have a single agent
+    if (message.agentId) {
+      const agent = agents.find(a => a.id === message.agentId);
+      if (agent) {
+        return agent.name;
+      }
+    }
+    
+    return "Assistant";
   };
 
   const copyToClipboard = async (text: string, messageId: string) => {
@@ -202,7 +232,7 @@ const MessageList: React.FC<MessageListProps> = ({ conversation }) => {
                 }}
               />
               <Text strong style={{ fontSize: "14px" }}>
-                {isUser ? "You" : isSystem ? "System" : "Assistant"}
+                {getSenderName(message)}
               </Text>
               <Text type="secondary" style={{ fontSize: "12px" }}>
                 {formatTime(message.timestamp)}
@@ -382,6 +412,15 @@ const CopyButton = styled(Button)`
   &:hover {
     opacity: 1 !important;
   }
+`;
+
+const AgentMention = styled.span`
+  background: #f6ffed;
+  color: #52c41a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  border: 1px solid #b7eb8f;
 `;
 
 export default MessageList;

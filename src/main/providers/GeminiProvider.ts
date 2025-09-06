@@ -187,6 +187,23 @@ export class GeminiProvider extends BaseProvider {
                 console.log(
                   `✅ [GEMINI] Tool executed: ${part.functionCall.name}`
                 );
+              } else {
+                // Handle missing tool/server gracefully
+                const errorMsg = !tool 
+                  ? `Tool '${part.functionCall.name}' not found in available tools`
+                  : `Server for tool '${part.functionCall.name}' not found or not active`;
+                
+                console.warn(`⚠️ [GEMINI] ${errorMsg}`);
+                
+                executedToolCalls.push({
+                  id: `gemini-${Date.now()}-${Math.random()}`,
+                  name: part.functionCall.name,
+                  args: part.functionCall.args || {},
+                  error: errorMsg,
+                });
+                
+                // Add error message to response instead of failing silently
+                finalResponse += `\n\n*Note: ${errorMsg}. Available tools: ${tools.map(t => t.name).join(', ')}*`;
               }
             } catch (error) {
               console.error(`❌ [GEMINI] Tool execution failed:`, error);

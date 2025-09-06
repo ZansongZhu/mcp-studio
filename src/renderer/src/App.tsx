@@ -6,6 +6,7 @@ import { store } from "./store";
 import Layout from "./components/Layout";
 import AppInitializer from "./components/AppInitializer";
 import HomePage from "./pages/Home";
+import AgentsPage from "./pages/Agents";
 import PromptTemplatesPage from "./pages/PromptTemplates";
 import MCPSettingsPage from "./pages/MCPSettings";
 import ModelSettingsPage from "./pages/ModelSettings";
@@ -28,6 +29,7 @@ const App: React.FC = () => {
           <Layout>
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/agents" element={<AgentsPage />} />
               <Route path="/prompts" element={<PromptTemplatesPage />} />
               <Route path="/mcp" element={<MCPSettingsPage />} />
               <Route path="/models" element={<ModelSettingsPage />} />

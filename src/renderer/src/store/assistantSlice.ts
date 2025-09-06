@@ -8,6 +8,8 @@ export interface Message {
   content: string;
   timestamp: number;
   modelId?: string;
+  agentId?: string; // ID of the agent that generated this message (backward compatibility)
+  agentIds?: string[]; // IDs of multiple agents (for multi-agent support)
   conversationId: string; // Normalized reference
   toolCallIds: string[]; // Array of tool call IDs
 }
@@ -30,6 +32,8 @@ export interface Conversation {
   updatedAt: number;
   modelId: string;
   mcpServerIds: string[];
+  agentId?: string;
+  lastMentionedAgentId?: string; // Track the last mentioned agent for this conversation
   isGenerating?: boolean;
   messageIds: string[]; // Array of message IDs instead of nested messages
 }
@@ -358,6 +362,59 @@ const assistantSlice = createSlice({
         changes: { modelId: action.payload.modelId, updatedAt: Date.now() },
       });
     },
+
+    updateConversationAgent: (
+      state,
+      action: PayloadAction<{ id: string; agentId?: string }>
+    ) => {
+      conversationAdapter.updateOne(state.conversations, {
+        id: action.payload.id,
+        changes: { agentId: action.payload.agentId, updatedAt: Date.now() },
+      });
+    },
+
+    updateConversationLastMentionedAgent: (
+      state,
+      action: PayloadAction<{ id: string; lastMentionedAgentId?: string }>
+    ) => {
+      conversationAdapter.updateOne(state.conversations, {
+        id: action.payload.id,
+        changes: { lastMentionedAgentId: action.payload.lastMentionedAgentId, updatedAt: Date.now() },
+      });
+    },
+
+    clearConversationMessages: (
+      state,
+      action: PayloadAction<string>
+    ) => {
+      const conversationId = action.payload;
+      const conversation = state.conversations.entities[conversationId];
+      
+      if (conversation) {
+        // Remove all messages for this conversation
+        const messageIds = conversation.messageIds;
+        messageAdapter.removeMany(state.messages, messageIds);
+        
+        // Remove all tool calls for these messages
+        const toolCallIds = messageIds.flatMap(messageId => 
+          Object.values(state.toolCalls.entities)
+            .filter(toolCall => toolCall?.messageId === messageId)
+            .map(toolCall => toolCall!.id)
+        );
+        toolCallAdapter.removeMany(state.toolCalls, toolCallIds);
+        
+        // Clear the message IDs array in the conversation
+        conversationAdapter.updateOne(state.conversations, {
+          id: conversationId,
+          changes: { 
+            messageIds: [],
+            updatedAt: Date.now(),
+          },
+        });
+      }
+      
+      state.ui.lastAction = 'clearConversationMessages';
+    },
   },
 });
 
@@ -460,6 +517,9 @@ export const {
   updateConversationTitle,
   updateConversationMcpServers,
   updateConversationModel,
+  updateConversationAgent,
+  updateConversationLastMentionedAgent,
+  clearConversationMessages,
 } = assistantSlice.actions;
 
 export default assistantSlice.reducer;

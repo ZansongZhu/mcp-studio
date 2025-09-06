@@ -27,8 +27,6 @@ const HomePage: React.FC = () => {
     activeServers,
     handleNewConversation,
     handleSendMessage,
-    updateConversationModel,
-    updateConversationServers,
   } = useConversation();
 
   const {
@@ -49,8 +47,8 @@ const HomePage: React.FC = () => {
     }
   }, [activeConversation?.modelId, saveActiveModelId]);
 
-  const handleSendMessageWithTools = async (message: string) => {
-    const result = await handleSendMessage(message);
+  const handleSendMessageWithTools = async (message: string, mentionedAgent?: any, mentionedAgents?: any[]) => {
+    const result = await handleSendMessage(message, mentionedAgent, mentionedAgents);
     
     // Handle /tools command
     if (result?.isToolsCommand) {
@@ -63,8 +61,8 @@ const HomePage: React.FC = () => {
     return result;
   };
 
-  const handleViewAvailableTools = () => {
 
+  const handleViewAvailableTools = () => {
     // This would need to be implemented differently since we can't directly dispatch from here
     // For now, just open the tools modal
     openToolsModal();
@@ -99,14 +97,6 @@ const HomePage: React.FC = () => {
           <>
             <ConversationHeader
               conversation={activeConversation}
-              availableModels={availableModels}
-              servers={servers}
-              onModelChange={(modelId) =>
-                updateConversationModel(activeConversation.id, modelId)
-              }
-              onServersChange={(serverIds) =>
-                updateConversationServers(activeConversation.id, serverIds)
-              }
             />
 
             <MessagesContainer>

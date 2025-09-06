@@ -124,6 +124,12 @@ const api = {
     setPromptTemplates: (templates: any[]): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("storage:setPromptTemplates", templates),
 
+    getAgents: (): Promise<any[]> =>
+      ipcRenderer.invoke("storage:getAgents"),
+
+    setAgents: (agents: any[]): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("storage:setAgents", agents),
+
     // Conversation persistence methods
     saveConversation: (conversation: any): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke("conversations:save", conversation),

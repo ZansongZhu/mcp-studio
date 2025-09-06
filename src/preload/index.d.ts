@@ -70,6 +70,8 @@ declare global {
         setMCPServers: (servers: MCPServer[]) => Promise<{ success: boolean }>;
         getPromptTemplates: () => Promise<any[]>;
         setPromptTemplates: (templates: any[]) => Promise<{ success: boolean }>;
+        getAgents: () => Promise<any[]>;
+        setAgents: (agents: any[]) => Promise<{ success: boolean }>;
       };
     };
   }

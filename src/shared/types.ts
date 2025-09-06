@@ -151,3 +151,15 @@ export interface ConversationMetric {
   providerId: string;
   timestamp: number;
 }
+
+// Agent types
+export interface Agent {
+  id: string;
+  name: string;
+  description?: string;
+  modelId: string;
+  mcpServerIds: string[];
+  systemInstructions?: string;
+  createdAt: number;
+  updatedAt: number;
+}

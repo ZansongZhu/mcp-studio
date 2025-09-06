@@ -9,9 +9,11 @@ import {
   addToolCall,
   updateConversationMcpServers,
   updateConversationModel,
+  updateConversationLastMentionedAgent,
   setActiveConversation,
   selectAllConversations,
-  selectActiveConversation
+  selectActiveConversation,
+  clearConversationMessages
 } from "../store/assistantSlice";
 import { AppConfig } from "@shared/config";
 
@@ -57,6 +59,7 @@ export const useConversation = () => {
     (state: RootState) => state.model
   );
   const { servers } = useSelector((state: RootState) => state.mcp);
+  const agents = useSelector((state: RootState) => state.agent.agents);
   const allMessages = useSelector((state: RootState) => state.assistant.messages.entities);
 
   const availableModels = providers.flatMap((p) => p.models);
@@ -90,7 +93,12 @@ export const useConversation = () => {
     );
   }, [activeModelId, availableModels, conversations.length, servers, dispatch]);
 
-  const handleSendMessage = useCallback(async (messageContent: string) => {
+  const handleSendMessage = useCallback(async (messageContent: string, mentionedAgent?: any, mentionedAgents?: any[]) => {
+    console.log("💬 [CHAT] handleSendMessage called");
+    console.log("💬 [CHAT] Message:", messageContent);
+    console.log("💬 [CHAT] Mentioned agent:", mentionedAgent);
+    console.log("💬 [CHAT] All mentioned agents:", mentionedAgents);
+    
     if (!messageContent.trim()) return;
     
     let currentConversation = activeConversation;
@@ -98,7 +106,7 @@ export const useConversation = () => {
       handleNewConversation();
       // After creating conversation, it will become the active conversation
       // We need to return here and wait for the next call
-      return;
+      return { needsRetry: true };
     }
 
     const conversationModelId = currentConversation.modelId;
@@ -121,11 +129,198 @@ export const useConversation = () => {
       return { isToolsCommand: true };
     }
 
+    // Handle /clear command
+    if (messageContent.trim() === "/clear") {
+      dispatch(clearConversationMessages(currentConversation.id));
+      message.success("Chat history cleared");
+      return { isClearCommand: true };
+    }
+
+    // Check for multi-agent mentions and handle sequentially
+    if (mentionedAgents && mentionedAgents.length > 1) {
+      console.log("🔥 [MULTI_AGENT] Multiple agents detected, handling sequentially:", mentionedAgents.map(a => a.name));
+      
+      // Add the user message first
+      const userMessage = {
+        role: "user" as const,
+        content: messageContent,
+        modelId: currentConversation.modelId,
+      };
+
+      dispatch(
+        addMessage({
+          conversationId: currentConversation.id,
+          message: userMessage,
+        })
+      );
+
+      // Update the last mentioned agent to the first one mentioned
+      if (mentionedAgents[0]) {
+        dispatch(updateConversationLastMentionedAgent({ 
+          id: currentConversation.id, 
+          lastMentionedAgentId: mentionedAgents[0].id 
+        }));
+      }
+
+      // Generate responses for each agent sequentially
+      for (let i = 0; i < mentionedAgents.length; i++) {
+        const agent = mentionedAgents[i];
+        console.log(`🔥 [MULTI_AGENT] Processing agent ${i + 1}/${mentionedAgents.length}: ${agent.name}`);
+        console.log(`🔥 [MULTI_AGENT] Agent config - Model: ${agent.modelId}, MCP Servers: ${agent.mcpServerIds}`);
+        
+        try {
+          dispatch(
+            setConversationGenerating({
+              conversationId: currentConversation.id,
+              isGenerating: true,
+            })
+          );
+
+          // Get conversation history for context
+          const conversationHistory = getConversationMessages(currentConversation.id);
+          const conversationMessages = pruneConversationHistory(conversationHistory);
+
+          // Use agent's configuration
+          const messageModelId = agent.modelId;
+          const messageServerIds = agent.mcpServerIds.filter(
+            (serverId: string) => servers.find((s) => s.id === serverId)?.isActive
+          );
+
+          const systemContent = agent.systemInstructions || 
+            "You are a helpful assistant. Use tools directly when needed without asking for permission.";
+
+          // Add context about other agents if this isn't the first response
+          const contextualSystemContent = i > 0 
+            ? `${systemContent}\n\nNote: This is a multi-agent conversation. Other agents have already responded above. Please provide your unique perspective and avoid repeating what others have said.`
+            : systemContent;
+
+          let systemMessage = {
+            role: "system" as const,
+            content: contextualSystemContent,
+          };
+
+          // Handle MCP tools if available
+          if (messageServerIds.length > 0) {
+            const availableToolsPromises = messageServerIds.map(async (serverId) => {
+              try {
+                const server = servers.find((s) => s.id === serverId);
+                if (server) {
+                  return await window.api.mcp.listTools(server);
+                }
+                return [];
+              } catch (error) {
+                console.error(`Failed to fetch tools for server ${serverId}:`, error);
+                return [];
+              }
+            });
+
+            const allTools = await Promise.all(availableToolsPromises);
+            const flattenedTools = allTools.flat();
+
+            if (flattenedTools.length > 0) {
+              const toolsDescription = flattenedTools
+                .map((tool) => `Tool: ${tool.name}\nDescription: ${tool.description || "No description available"}\nParameters: ${JSON.stringify(tool.inputSchema || {})}\n`)
+                .join("\n");
+
+              systemMessage = {
+                role: "system" as const,
+                content: `${contextualSystemContent}\n\nYou have access to the following tools:\n\n${toolsDescription}\n\nWhen you need to use a tool, format your response like this:\n\n<tool_call>{"serverId": "SERVER_ID", "name": "TOOL_NAME", "args": {...}}</tool_call>`,
+              };
+            }
+          }
+
+          // Get the model for this agent
+          let conversationModel = availableModels.find((m) => m.id === messageModelId);
+          
+          if (!conversationModel) {
+            console.error(`Model not found for agent ${agent.name}: ${messageModelId}`);
+            continue; // Skip this agent if model not found
+          }
+
+          const messages = [systemMessage, ...conversationMessages];
+          
+          // Generate response
+          let result: any;
+          if (messageServerIds.length > 0) {
+            result = await window.api.ai.generateResponseWithTools({
+              providerId: conversationModel.providerId,
+              model: conversationModel.id,
+              messages,
+              maxTokens: conversationModel.maxTokens,
+              serverIds: messageServerIds,
+            });
+          } else {
+            result = await window.api.ai.generateResponse({
+              providerId: conversationModel.providerId,
+              model: conversationModel.id,
+              messages,
+              maxTokens: conversationModel.maxTokens,
+            });
+          }
+
+          console.log(`🔥 [MULTI_AGENT] Agent ${agent.name} AI response:`, { success: result.success, hasResponse: !!result.response, error: result.error });
+
+          if (result.success && result.response) {
+            const assistantMessage = {
+              role: "assistant" as const,
+              content: result.response,
+              modelId: messageModelId,
+              agentId: agent.id,
+            };
+
+            // Add the assistant message
+            dispatch(
+              addMessage({
+                conversationId: currentConversation.id,
+                message: assistantMessage,
+              })
+            );
+
+            console.log(`✅ [MULTI_AGENT] Agent ${agent.name} response added`);
+          } else {
+            console.log(`⚠️ [MULTI_AGENT] Agent ${agent.name} did not return a valid response`);
+          }
+
+        } catch (error) {
+          console.error(`❌ [MULTI_AGENT] Error with agent ${agent.name}:`, error);
+          
+          // Add error message with specific backend error details
+          const specificError = (error as Error).message || "Unknown error occurred";
+          const errorMessage = {
+            role: "assistant" as const,
+            content: `Sorry, I encountered an error: ${specificError}`,
+            modelId: agent.modelId,
+            agentId: agent.id,
+          };
+
+          dispatch(
+            addMessage({
+              conversationId: currentConversation.id,
+              message: errorMessage,
+            })
+          );
+        }
+        
+        console.log(`🔄 [MULTI_AGENT] Completed processing agent ${i + 1}/${mentionedAgents.length}: ${agent.name}`);
+      }
+
+      // Turn off generating state
+      dispatch(
+        setConversationGenerating({
+          conversationId: currentConversation.id,
+          isGenerating: false,
+        })
+      );
+
+      console.log("🎉 [MULTI_AGENT] All agents have responded");
+      return { success: true, multiAgent: true };
+    }
+
     // Define the user message
     const userMessage = {
       role: "user" as const,
       content: messageContent,
-      modelId: conversationModelId,
+      modelId: currentConversation.modelId,
     };
 
     dispatch(
@@ -143,33 +338,83 @@ export const useConversation = () => {
     );
 
     try {
-      // Get the conversation model and provider
-      let conversationModel = defaultModels.find(
-        (m) => m.id === conversationModelId
-      );
-      
-      if (!conversationModel) {
-        throw new Error("Conversation model not found");
-      }
-
       // Get conversation history for context - use actual messages from the conversation
       const conversationHistory = getConversationMessages(currentConversation.id);
       const conversationMessages = pruneConversationHistory(conversationHistory);
 
-      // Add system instructions if we have active servers
+      // Add system instructions - use agent's instructions if available
       const activeServerIds = currentConversation.mcpServerIds.filter(
         (serverId) => servers.find((s) => s.id === serverId)?.isActive
       );
 
+      // Agent selection priority:
+      // 1. Explicitly mentioned agent in current message
+      // 2. Last mentioned agent in this conversation  
+      // 3. Conversation's default agent (if set)
+      // 4. No agent (use default system instructions)
+      const selectedAgent = mentionedAgent || 
+        (currentConversation.lastMentionedAgentId ? agents.find(agent => agent.id === currentConversation.lastMentionedAgentId) : null) ||
+        (currentConversation.agentId ? agents.find(agent => agent.id === currentConversation.agentId) : null);
+
+      console.log("🤖 [AGENT] Agent selection process:");
+      console.log("  - Mentioned in current message:", mentionedAgent?.name || "None");
+      console.log("  - Last mentioned in conversation:", currentConversation.lastMentionedAgentId ? agents.find(a => a.id === currentConversation.lastMentionedAgentId)?.name || "Unknown" : "None");
+      console.log("  - Conversation default agent:", currentConversation.agentId ? agents.find(a => a.id === currentConversation.agentId)?.name || "Unknown" : "None");
+      console.log("  - SELECTED AGENT:", selectedAgent?.name || "None (using default)");
+
+      let systemContent = selectedAgent?.systemInstructions || 
+        "You are a helpful assistant. Use tools directly when needed without asking for permission. When you call a tool, ALWAYS interpret and present the returned data in a clear, formatted response. Never show raw tool calls or ask the user to execute them - the tools execute automatically and you should analyze the results. Present financial data in tables, format numbers clearly, and provide meaningful insights from the data. Be concise and execute tools immediately when appropriate data is requested.";
+
+      console.log("📝 [SYSTEM] Using system content:", systemContent.substring(0, 100) + "...");
+
+      // If we have a selected agent (mentioned or last mentioned), use its model and MCP servers
+      let messageModelId = conversationModelId;
+      let messageServerIds = activeServerIds;
+      
+      if (selectedAgent) {
+        messageModelId = selectedAgent.modelId;
+        messageServerIds = selectedAgent.mcpServerIds.filter(
+          (serverId: string) => servers.find((s) => s.id === serverId)?.isActive
+        );
+        console.log("🔄 [CONFIG] Using selected agent's config:");
+        console.log("  - Model ID:", messageModelId);
+        console.log("  - MCP Server IDs:", messageServerIds);
+      } else {
+        console.log("🔄 [CONFIG] Using default config:");
+        console.log("  - Model ID:", messageModelId);
+        console.log("  - MCP Server IDs:", messageServerIds);
+      }
+
+      // If an agent was explicitly mentioned in this message, update the conversation's last mentioned agent
+      if (mentionedAgent) {
+        console.log("💾 [CONVERSATION] Updating last mentioned agent to:", mentionedAgent.name);
+        dispatch(updateConversationLastMentionedAgent({ 
+          id: currentConversation.id, 
+          lastMentionedAgentId: mentionedAgent.id 
+        }));
+      }
+
+      // Get the model for this message (could be from mentioned agent)
+      let conversationModel = availableModels.find(
+        (m) => m.id === messageModelId
+      );
+      
+      console.log("🔧 [MODEL] Looking for model:", messageModelId);
+      console.log("🔧 [MODEL] Available models:", availableModels.map(m => ({ id: m.id, name: m.name })));
+      console.log("🔧 [MODEL] Found model:", conversationModel);
+      
+      if (!conversationModel) {
+        throw new Error(`Conversation model not found: ${messageModelId}. Available models: ${availableModels.map(m => m.id).join(', ')}`);
+      }
+
       let systemMessage = {
         role: "system" as const,
-        content:
-          "You are a helpful assistant. Use tools directly when needed without asking for permission. When you call a tool, ALWAYS interpret and present the returned data in a clear, formatted response. Never show raw tool calls or ask the user to execute them - the tools execute automatically and you should analyze the results. Present financial data in tables, format numbers clearly, and provide meaningful insights from the data. Be concise and execute tools immediately when appropriate data is requested.",
+        content: systemContent,
       };
 
-      if (activeServerIds.length > 0) {
+      if (messageServerIds.length > 0) {
         // Get available tools for active servers
-        const availableToolsPromises = activeServerIds.map(async (serverId) => {
+        const availableToolsPromises = messageServerIds.map(async (serverId) => {
           try {
             const server = servers.find((s) => s.id === serverId);
             if (server) {
@@ -218,13 +463,13 @@ export const useConversation = () => {
       let result: any;
       let hasToolCalls = false;
 
-      if (activeServerIds.length > 0) {
+      if (messageServerIds.length > 0) {
         result = await window.api.ai.generateResponseWithTools({
           providerId: conversationModel.providerId,
           model: conversationModel.id,
           messages,
           maxTokens: conversationModel.maxTokens,
-          serverIds: activeServerIds,
+          serverIds: messageServerIds,
         });
         hasToolCalls = !!(result.toolCalls && result.toolCalls.length > 0);
       } else {
@@ -244,7 +489,8 @@ export const useConversation = () => {
         const assistantMessage = {
           role: "assistant" as const,
           content: result.response,
-          modelId: conversationModelId,
+          modelId: messageModelId,
+          agentId: selectedAgent?.id, // Store which agent generated this message
         };
 
         // Add the assistant message
@@ -343,7 +589,11 @@ export const useConversation = () => {
       }
     } catch (error) {
       console.error("Error sending message:", error);
-      message.error("Failed to send message");
+      
+      // Show the specific backend error message if available
+      const errorMessage = (error as Error).message || "Failed to send message";
+      message.error(errorMessage);
+      
       return { success: false, error };
     } finally {
       dispatch(
@@ -359,6 +609,7 @@ export const useConversation = () => {
     conversations,
     defaultModels,
     servers,
+    agents,
     dispatch,
     getConversationMessages,
   ]);

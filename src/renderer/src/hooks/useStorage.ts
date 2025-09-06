@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { ModelProvider, MCPServer } from "@shared/types";
+import { ModelProvider, MCPServer, Agent } from "@shared/types";
 
 export const useStorage = () => {
   // Remove the automatic loading logic since AppInitializer handles it
@@ -28,5 +28,13 @@ export const useStorage = () => {
     }
   }, []);
 
-  return { saveProviders, saveActiveModelId, saveMCPServers };
+  const saveAgents = useCallback(async (agents: Agent[]) => {
+    try {
+      await window.api.storage.setAgents(agents);
+    } catch (error) {
+      console.error("Failed to save agents:", error);
+    }
+  }, []);
+
+  return { saveProviders, saveActiveModelId, saveMCPServers, saveAgents };
 };

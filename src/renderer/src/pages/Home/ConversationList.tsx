@@ -112,29 +112,6 @@ const ConversationList: React.FC = () => {
                 <Meta>
                   {conversation.messageIds.length} messages •{" "}
                   {formatTime(conversation.updatedAt)}
-                  {conversation.mcpServerIds.length > 0 && (
-                    <div>
-                      <ServerTags>
-                        {conversation.mcpServerIds
-                          .slice(0, 2)
-                          .map((serverId) => {
-                            const server = servers.find(
-                              (s) => s.id === serverId,
-                            );
-                            return server ? (
-                              <Tag key={server.id} color="blue">
-                                {server.name}
-                              </Tag>
-                            ) : null;
-                          })}
-                        {conversation.mcpServerIds.length > 2 && (
-                          <Tag color="default">
-                            +{conversation.mcpServerIds.length - 2} more
-                          </Tag>
-                        )}
-                      </ServerTags>
-                    </div>
-                  )}
                 </Meta>
               </TextContent>
               <ActionsWrapper>

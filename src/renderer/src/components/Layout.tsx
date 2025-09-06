@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Layout as AntLayout, Menu } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
-import { MessageSquare, Settings, Cpu, FileText } from "lucide-react";
+import { MessageSquare, Settings, Cpu, FileText, Bot } from "lucide-react";
 import styled from "styled-components";
 
 const { Sider, Content } = AntLayout;
@@ -20,6 +20,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       key: "/",
       icon: <MessageSquare size={16} />,
       label: "Assistant",
+    },
+    {
+      key: "/agents",
+      icon: <Bot size={16} />,
+      label: "Agents",
     },
     {
       key: "/prompts",

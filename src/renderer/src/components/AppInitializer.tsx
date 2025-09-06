@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { setProviders, setActiveModel } from "../store/modelSlice";
 import { setServers } from "../store/mcpSlice";
+import { setAgents } from "../store/agentSlice";
 import { ModelProvider } from "@shared/types";
 
 // Define default providers with Ollama included
@@ -185,6 +186,13 @@ const AppInitializer: React.FC = () => {
         const storedServers = await (window as any).api.storage.getMCPServers();
         if (storedServers && storedServers.length > 0) {
           dispatch(setServers(storedServers));
+        }
+
+        // Load stored agents
+        const storedAgents = await (window as any).api.storage.getAgents();
+        if (storedAgents && storedAgents.length > 0) {
+          dispatch(setAgents(storedAgents));
+          console.log(`Loaded ${storedAgents.length} stored agents`);
         }
       } catch (error) {
         console.error("Failed to load stored data:", error);

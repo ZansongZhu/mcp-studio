@@ -1,69 +1,52 @@
 import React from "react";
-import { Select, Typography } from "antd";
+import { Typography } from "antd";
+import { useSelector } from "react-redux";
+import { Bot, User } from "lucide-react";
 import styled from "styled-components";
+import { RootState } from "../../store";
 
 const { Title } = Typography;
 
 interface ConversationHeaderProps {
   conversation: any;
-  availableModels: any[];
-  servers: any[];
-  onModelChange: (modelId: string) => void;
-  onServersChange: (serverIds: string[]) => void;
 }
 
 const ConversationHeader: React.FC<ConversationHeaderProps> = ({
   conversation,
-  availableModels,
-  servers,
-  onModelChange,
-  onServersChange,
 }) => {
+  const agents = useSelector((state: RootState) => state.agent.agents);
+  
+  // Determine the active agent for this conversation
+  // Priority: lastMentionedAgent > conversationDefaultAgent
+  const activeAgent = conversation.lastMentionedAgentId 
+    ? agents.find(agent => agent.id === conversation.lastMentionedAgentId)
+    : conversation.agentId 
+      ? agents.find(agent => agent.id === conversation.agentId)
+      : null;
+      
+  const isGenerating = conversation.isGenerating;
+
   return (
     <ChatHeader>
       <Title level={4} style={{ margin: 0 }}>
         {conversation.title}
       </Title>
-      <HeaderControls>
-        <ControlGroup>
-          <ControlLabel>Model:</ControlLabel>
-          <Select
-            value={conversation.modelId}
-            onChange={onModelChange}
-            style={{ width: 160 }}
-            placeholder="Select model"
-          >
-            {availableModels.map((model) => {
-              return (
-                <Select.Option key={model.id} value={model.id}>
-                  {model.name}
-                </Select.Option>
-              );
-            })}
-          </Select>
-        </ControlGroup>
-        <ControlGroup>
-          <ControlLabel>Tools:</ControlLabel>
-          <Select
-            mode="multiple"
-            value={conversation.mcpServerIds}
-            onChange={onServersChange}
-            style={{ width: 250 }}
-            placeholder="MCP Servers"
-            optionLabelProp="label"
-          >
-            {servers.map((server) => (
-              <Select.Option
-                key={server.id}
-                value={server.id}
-                label={server.name}
-              >
-                {server.name}
-              </Select.Option>
-            ))}
-          </Select>
-        </ControlGroup>
-      </HeaderControls>
+      <HeaderInfo>
+        {activeAgent ? (
+          <AgentStatus>
+            <AgentIcon>
+              <Bot size={14} />
+            </AgentIcon>
+            <AgentName>@{activeAgent.name}</AgentName>
+            {isGenerating && <StatusText>responding...</StatusText>}
+          </AgentStatus>
+        ) : (
+          <StatusInfo>
+            <User size={14} />
+            <InfoText>Type @ to mention an agent</InfoText>
+          </StatusInfo>
+        )}
+      </HeaderInfo>
     </ChatHeader>
   );
 };
@@ -73,26 +56,55 @@ const ChatHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
+  background: white;
   border-bottom: 1px solid #f0f0f0;
 `;
 
-const HeaderControls = styled.div`
+const HeaderInfo = styled.div`
   display: flex;
-  gap: 12px;
   align-items: center;
 `;
 
-const ControlGroup = styled.div`
+const StatusInfo = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 `;
 
-const ControlLabel = styled.span`
-  font-size: 14px;
+const AgentStatus = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 12px;
+  padding: 4px 8px;
+`;
+
+const AgentIcon = styled.div`
+  color: #52c41a;
+  display: flex;
+  align-items: center;
+`;
+
+const AgentName = styled.span`
+  font-size: 12px;
+  color: #52c41a;
   font-weight: 500;
+`;
+
+const StatusText = styled.span`
+  font-size: 11px;
   color: #666;
-  min-width: fit-content;
+  font-style: italic;
+  margin-left: 4px;
+`;
+
+const InfoText = styled.span`
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+  margin-left: 4px;
 `;
 
 export default ConversationHeader;

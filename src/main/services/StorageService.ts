@@ -1,5 +1,5 @@
 import Store from "electron-store";
-import { ModelProvider, MCPServer } from "@shared/types";
+import { ModelProvider, MCPServer, Agent } from "@shared/types";
 import { app } from "electron";
 import { join } from "path";
 import { readFileSync, existsSync } from "fs";
@@ -10,6 +10,7 @@ interface StorageSchema {
   activeModelId?: string;
   mcpServers: MCPServer[];
   promptTemplates: any[];
+  agents: Agent[];
 }
 
 interface ExternalConfig {
@@ -17,6 +18,7 @@ interface ExternalConfig {
   activeModelId?: string;
   mcpServers: MCPServer[];
   promptTemplates: any[];
+  agents: Agent[];
 }
 
 export class StorageService {
@@ -30,6 +32,7 @@ export class StorageService {
         activeModelId: undefined,
         mcpServers: [],
         promptTemplates: [],
+        agents: [],
       },
       name: "mcp-studio-config",
     });
@@ -127,6 +130,21 @@ export class StorageService {
 
   setPromptTemplates(templates: any[]): void {
     this.store.set("promptTemplates", templates);
+  }
+
+  getAgents(): Agent[] {
+    // First try external config
+    const externalConfig = this.readExternalConfig();
+    if (externalConfig?.agents && externalConfig.agents.length > 0) {
+      return externalConfig.agents;
+    }
+    
+    // Fall back to electron-store
+    return this.store.get("agents", []);
+  }
+
+  setAgents(agents: Agent[]): void {
+    this.store.set("agents", agents);
   }
 
   clearAll(): void {

@@ -406,6 +406,15 @@ function setupStorageIPCHandlers() {
     return { success: true };
   });
 
+  ipcMain.handle("storage:getAgents", () => {
+    return storageService.getAgents();
+  });
+
+  ipcMain.handle("storage:setAgents", (_, agents: any[]) => {
+    storageService.setAgents(agents);
+    return { success: true };
+  });
+
   logger.debug("Storage IPC handlers registered");
 }
 
