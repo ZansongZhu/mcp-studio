@@ -2,6 +2,7 @@ import { BaseProvider } from "./BaseProvider";
 import { ModelProvider, AIProviderResponse } from "@shared/types";
 import mcpService from "../services/MCPService";
 import { toolProcessor } from "../services/ToolProcessor";
+import { logger } from "@shared/monitoring";
 
 export class GeminiProvider extends BaseProvider {
   constructor(provider?: ModelProvider) {
@@ -69,10 +70,10 @@ export class GeminiProvider extends BaseProvider {
     tools: any[],
     servers: any[]
   ): Promise<AIProviderResponse> {
-    console.log(
+    logger.info(
       `🔴🛠️ [GEMINI TOOLS] Starting NATIVE TOOL call to ${model} with ${tools.length} tools`
     );
-    console.log(
+    logger.info(
       `✅ [GEMINI TOOLS] This method WILL process tool_code blocks automatically`
     );
 

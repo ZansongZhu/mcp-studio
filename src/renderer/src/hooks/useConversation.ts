@@ -192,13 +192,16 @@ export const useConversation = () => {
           const toolsDescription = flattenedTools
             .map(
               (tool) =>
-                `Tool: ${tool.name}\nDescription: ${tool.description || "No description available"}\nParameters: ${JSON.stringify(tool.inputSchema || {})}\n`
+                `Tool: ${tool.name} (Server: ${tool.serverId})\nDescription: ${tool.description || "No description available"}\nParameters: ${JSON.stringify(tool.inputSchema || {})}\n`
             )
             .join("\n");
 
+          const availableServerIds = [...new Set(flattenedTools.map(tool => tool.serverId))];
+          const serverIdsText = availableServerIds.map(id => `"${id}"`).join(", ");
+
           systemMessage = {
             role: "system" as const,
-            content: `You are a helpful assistant with access to the following tools:\n\n${toolsDescription}\n\nWhen you need to use a tool, format your response like this:\n\n<tool_call>{"serverId": "SERVER_ID", "name": "TOOL_NAME", "args": {...}}</tool_call>\n\nReplace SERVER_ID with the ID of the appropriate server, TOOL_NAME with the name of the tool, and provide the necessary arguments in the args object. The tool will be executed automatically, and the result will be added to your response.`,
+            content: `You are a helpful assistant with access to the following tools:\n\n${toolsDescription}\n\nWhen you need to use a tool, format your response like this:\n\n<tool_call>{"serverId": "SERVER_ID", "name": "TOOL_NAME", "args": {...}}</tool_call>\n\nIMPORTANT: SERVER_ID must be one of these available server IDs: ${serverIdsText}. Use the exact server ID shown in parentheses next to each tool name. TOOL_NAME must match exactly one of the available tool names listed above. Provide the necessary arguments in the args object according to the tool's parameter schema.`,
           };
         }
       }
