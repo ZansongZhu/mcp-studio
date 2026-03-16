@@ -202,8 +202,8 @@ export function validateMCPServerConfig(server: any): ValidationResult {
     errors.push('Server name is required and must be a string');
   }
 
-  if (!server.type || !['stdio', 'sse', 'streamableHttp', 'inMemory'].includes(server.type)) {
-    errors.push('Server type must be one of: stdio, sse, streamableHttp, inMemory');
+  if (!server.type || !['stdio', 'sse', 'streamableHttp', 'http', 'inMemory'].includes(server.type)) {
+    errors.push('Server type must be one of: stdio, sse, streamableHttp, http, inMemory');
   }
 
   // Validate based on server type
@@ -224,18 +224,14 @@ export function validateMCPServerConfig(server: any): ValidationResult {
     if (server.env && typeof server.env !== 'object') {
       errors.push('Environment variables must be an object');
     }
-  } else if (['sse', 'streamableHttp'].includes(server.type)) {
-    if (!server.baseUrl || typeof server.baseUrl !== 'string') {
+  } else if (['sse', 'streamableHttp', 'http'].includes(server.type)) {
+    const effectiveUrl = server.baseUrl || server.url;
+    if (!effectiveUrl || typeof effectiveUrl !== 'string') {
       errors.push('Base URL is required for URL-based servers');
     }
 
-    if (server.baseUrl && !validateUrl(server.baseUrl)) {
+    if (effectiveUrl && !validateUrl(effectiveUrl)) {
       errors.push('Base URL must be a valid HTTP/HTTPS URL');
-    }
-
-    // Security: Only allow HTTPS in production
-    if (server.baseUrl && server.baseUrl.startsWith('http:') && process.env.NODE_ENV === 'production') {
-      errors.push('Only HTTPS URLs are allowed in production');
     }
 
     if (server.headers && typeof server.headers !== 'object') {

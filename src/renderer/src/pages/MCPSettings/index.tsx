@@ -34,6 +34,8 @@ const MCPSettingsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<MCPServer | null>(null);
   const [form] = Form.useForm();
+  const typeValue = Form.useWatch("type", form);
+  const isUrlBased = typeValue === "sse" || typeValue === "streamableHttp" || typeValue === "http";
   const [connectingServers, setConnectingServers] = useState<Set<string>>(
     new Set(),
   );
@@ -50,6 +52,7 @@ const MCPSettingsPage: React.FC = () => {
     setEditingServer(server);
     form.setFieldsValue({
       ...server,
+      baseUrl: server.baseUrl || server.url || "",
       args: server.args?.join("\n") || "",
       env: server.env
         ? Object.entries(server.env)
@@ -61,6 +64,7 @@ const MCPSettingsPage: React.FC = () => {
             .map(([k, v]) => `${k}=${v}`)
             .join("\n")
         : "",
+      proxyUrl: server.proxyUrl || "",
     });
     setIsModalOpen(true);
   };
@@ -126,8 +130,10 @@ const MCPSettingsPage: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields();
+      await form.validateFields();
+      const values = form.getFieldsValue(true);
 
+      const headersRaw = values.headers || "";
       const serverData = {
         name: values.name,
         description: values.description,
@@ -138,9 +144,10 @@ const MCPSettingsPage: React.FC = () => {
           ? values.args.split("\n").filter((arg: string) => arg.trim())
           : [],
         env: values.env ? parseKeyValueString(values.env) : {},
-        headers: values.headers ? parseKeyValueString(values.headers) : {},
-        isActive: false,
-        timeout: values.timeout,
+        headers: headersRaw ? parseKeyValueString(headersRaw) : {},
+        proxyUrl: values.proxyUrl || undefined,
+        isActive: editingServer ? editingServer.isActive : false,
+        timeout: values.timeout ? Number(values.timeout) : undefined,
         longRunning: values.longRunning || false,
       };
 
@@ -405,72 +412,72 @@ const MCPSettingsPage: React.FC = () => {
               <Select.Option value="streamableHttp">
                 Streamable HTTP
               </Select.Option>
+              <Select.Option value="http">HTTP</Select.Option>
             </Select>
           </Form.Item>
 
+          {/* URL-based fields — always mounted so validateFields() always captures their values */}
           <Form.Item
-            noStyle
-            shouldUpdate={(prevValues, currentValues) =>
-              prevValues.type !== currentValues.type
-            }
+            name="baseUrl"
+            label="Base URL"
+            style={{ display: isUrlBased ? undefined : "none" }}
+            rules={[{ required: isUrlBased, message: "Please enter base URL" }]}
           >
-            {({ getFieldValue }) => {
-              const type = getFieldValue("type");
+            <Input placeholder="http://localhost:3000" />
+          </Form.Item>
 
-              if (type === "sse" || type === "streamableHttp") {
-                return (
-                  <>
-                    <Form.Item
-                      name="baseUrl"
-                      label="Base URL"
-                      rules={[
-                        { required: true, message: "Please enter base URL" },
-                      ]}
-                    >
-                      <Input placeholder="http://localhost:3000" />
-                    </Form.Item>
+          <Form.Item
+            name="headers"
+            label="Headers"
+            style={{ display: isUrlBased ? undefined : "none" }}
+          >
+            <TextArea
+              rows={3}
+              placeholder="Content-Type=application/json&#10;Authorization=Bearer token"
+              style={{ fontFamily: "monospace" }}
+            />
+          </Form.Item>
 
-                    <Form.Item name="headers" label="Headers">
-                      <TextArea
-                        rows={3}
-                        placeholder="Content-Type=application/json&#10;Authorization=Bearer token"
-                        style={{ fontFamily: "monospace" }}
-                      />
-                    </Form.Item>
-                  </>
-                );
-              }
+          <Form.Item
+            name="proxyUrl"
+            label="Proxy URL"
+            style={{ display: isUrlBased ? undefined : "none" }}
+          >
+            <Input placeholder="http://127.0.0.1:9000 (optional, for corporate proxy/VPN)" />
+          </Form.Item>
 
-              return (
-                <>
-                  <Form.Item
-                    name="command"
-                    label="Command"
-                    rules={[
-                      { required: true, message: "Please enter command" },
-                    ]}
-                  >
-                    <Input placeholder="npx @modelcontextprotocol/server-filesystem" />
-                  </Form.Item>
+          {/* Stdio fields — always mounted */}
+          <Form.Item
+            name="command"
+            label="Command"
+            style={{ display: isUrlBased ? "none" : undefined }}
+            rules={[{ required: !isUrlBased, message: "Please enter command" }]}
+          >
+            <Input placeholder="npx @modelcontextprotocol/server-filesystem" />
+          </Form.Item>
 
-                  <Form.Item name="args" label="Arguments">
-                    <TextArea
-                      rows={3}
-                      placeholder="--port&#10;8080"
-                      style={{ fontFamily: "monospace" }}
-                    />
-                  </Form.Item>
+          <Form.Item
+            name="args"
+            label="Arguments"
+            style={{ display: isUrlBased ? "none" : undefined }}
+          >
+            <TextArea
+              rows={3}
+              placeholder="--port&#10;8080"
+              style={{ fontFamily: "monospace" }}
+            />
+          </Form.Item>
 
-                  <Form.Item name="env" label="Environment Variables">
-                    <TextArea
-                      rows={3}
-                      placeholder="API_KEY=your-key&#10;DEBUG=true"
-                      style={{ fontFamily: "monospace" }}
-                    />
-                  </Form.Item>
-                </>
-              );
-            }}
+          <Form.Item
+            name="env"
+            label="Environment Variables"
+            style={{ display: isUrlBased ? "none" : undefined }}
+          >
+            <TextArea
+              rows={3}
+              placeholder="API_KEY=your-key&#10;DEBUG=true"
+              style={{ fontFamily: "monospace" }}
+            />
           </Form.Item>
 
           <Form.Item name="timeout" label="Timeout (seconds)">

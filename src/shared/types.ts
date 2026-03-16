@@ -2,12 +2,14 @@ export interface MCPServer {
   id: string;
   name: string;
   description?: string;
-  type: "stdio" | "sse" | "streamableHttp" | "inMemory";
+  type: "stdio" | "sse" | "streamableHttp" | "http" | "inMemory";
   baseUrl?: string;
+  url?: string;
   command?: string;
   args?: string[];
   env?: Record<string, string>;
   headers?: Record<string, string>;
+  proxyUrl?: string;
   isActive: boolean;
   timeout?: number;
   longRunning?: boolean;

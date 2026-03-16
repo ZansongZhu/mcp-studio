@@ -12,14 +12,26 @@ import {
 } from "@shared/types";
 import { app } from "electron";
 import { v4 as uuidv4 } from "uuid";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 
 class MCPService {
   private clients: Map<string, Client> = new Map();
   private activeToolCalls: Map<string, AbortController> = new Map();
 
+  private createProxyFetch(proxyUrl: string): (url: string | URL, init?: RequestInit) => Promise<Response> {
+    const agent = new ProxyAgent(proxyUrl);
+    return async (url: string | URL, init?: RequestInit) => {
+      const response = await undiciFetch(url as any, {
+        ...(init as any),
+        dispatcher: agent,
+      });
+      return response as unknown as Response;
+    };
+  }
+
   private getServerKey(server: MCPServer): string {
     return JSON.stringify({
-      baseUrl: server.baseUrl,
+      baseUrl: server.baseUrl || server.url,
       command: server.command,
       args: Array.isArray(server.args) ? server.args : [],
       env: server.env,
@@ -53,14 +65,18 @@ class MCPService {
       | SSEClientTransport
       | StreamableHTTPClientTransport;
 
-    if (server.baseUrl) {
-      if (server.type === "streamableHttp") {
-        transport = new StreamableHTTPClientTransport(new URL(server.baseUrl), {
+    const serverUrl = server.baseUrl || server.url;
+    if (serverUrl) {
+      const proxyFetch = server.proxyUrl ? this.createProxyFetch(server.proxyUrl) : undefined;
+      if (server.type === "streamableHttp" || server.type === "http") {
+        transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
           requestInit: { headers: server.headers || {} },
+          ...(proxyFetch && { fetch: proxyFetch }),
         });
       } else if (server.type === "sse") {
-        transport = new SSEClientTransport(new URL(server.baseUrl), {
+        transport = new SSEClientTransport(new URL(serverUrl), {
           requestInit: { headers: server.headers || {} },
+          ...(proxyFetch && { fetch: proxyFetch }),
         });
       } else {
         throw new Error("Invalid server type for URL-based connection");

@@ -2,7 +2,7 @@ import Store from "electron-store";
 import { ModelProvider, MCPServer } from "@shared/types";
 import { app } from "electron";
 import { join } from "path";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { homedir } from "os";
 
 interface StorageSchema {
@@ -111,6 +111,19 @@ export class StorageService {
   }
 
   setMCPServers(servers: MCPServer[]): void {
+    // If external config exists, write back to it so GUI changes persist
+    if (existsSync(this.externalConfigPath)) {
+      try {
+        const configContent = readFileSync(this.externalConfigPath, 'utf8');
+        const config = JSON.parse(configContent);
+        config.mcpServers = servers;
+        writeFileSync(this.externalConfigPath, JSON.stringify(config, null, 2), 'utf8');
+        console.log('[StorageService] Updated MCP servers in external config');
+        return;
+      } catch (error) {
+        console.error('[StorageService] Failed to update external config, falling back to electron-store:', error);
+      }
+    }
     this.store.set("mcpServers", servers);
   }
 
