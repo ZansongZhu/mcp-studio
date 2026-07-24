@@ -27,7 +27,12 @@ export const AppConfig = {
         timeout: 30000,
       },
       qwen: {
-        baseUrl: "https://dashscope.aliyuncs.com/api/v1",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        maxRetries: 3,
+        timeout: 30000,
+      },
+      glm: {
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4",
         maxRetries: 3,
         timeout: 30000,
       },

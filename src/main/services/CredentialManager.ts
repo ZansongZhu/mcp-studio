@@ -256,6 +256,7 @@ export class CredentialManager {
       gemini: /^[A-Za-z0-9\-_]{39}$/,
       deepseek: /^sk-[A-Za-z0-9]{48,}$/,
       qwen: /^sk-[A-Za-z0-9]{20,}$/,
+      glm: /^[A-Za-z0-9]+\.[A-Za-z0-9]+$/,
     };
 
     const rule = validationRules[providerId as keyof typeof validationRules];

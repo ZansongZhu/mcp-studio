@@ -3,9 +3,9 @@ import { ModelProvider, AIProviderResponse } from "@shared/types";
 import mcpService from "../services/MCPService";
 import { toolProcessor } from "../services/ToolProcessor";
 
-export class QwenProvider extends BaseProvider {
+export class GLMProvider extends BaseProvider {
   constructor(provider?: ModelProvider) {
-    super(provider, 'qwen');
+    super(provider, 'glm');
   }
 
   async generateResponse(
@@ -13,7 +13,7 @@ export class QwenProvider extends BaseProvider {
     model: string,
     maxTokens?: number
   ): Promise<string> {
-    this.logProviderCall('qwen', model, messages?.length);
+    this.logProviderCall('glm', model, messages?.length);
     this.validateProvider();
 
     const OpenAI = require("openai");
@@ -28,9 +28,77 @@ export class QwenProvider extends BaseProvider {
       });
 
       const response = completion.choices[0]?.message?.content || "";
-      this.logProviderSuccess('qwen', model, response.length);
+      this.logProviderSuccess('glm', model, response.length);
       return response;
     });
+  }
+
+  /**
+   * GLM/Zhipu's function-calling validator returns an opaque 500 ("网络错误")
+   * when a tool's JSON Schema has a *property named* like a reserved schema
+   * keyword — most notably `$ref`. GLM intercepts the key as a schema
+   * reference even though here it is a legitimate field name, and crashes.
+   * (Real `$ref`/`$defs`/`additionalProperties` used as schema keywords are
+   * fine — only $-prefixed reserved names used as PROPERTY KEYS break it.)
+   *
+   * We recursively drop such property keys (and any matching `required`
+   * entries). The dropped fields are rare, deeply-nested optionals, so the
+   * tool stays usable; the alternative is the whole request failing with 500.
+   */
+  private static readonly RESERVED_PROP_NAMES = new Set([
+    "$ref",
+    "$schema",
+    "$id",
+    "$defs",
+    "$comment",
+  ]);
+
+  private sanitizeSchema(schema: any): any {
+    if (Array.isArray(schema)) {
+      return schema.map((item) => this.sanitizeSchema(item));
+    }
+    if (!schema || typeof schema !== "object") {
+      return schema;
+    }
+
+    const out: any = {};
+    for (const [key, value] of Object.entries(schema)) {
+      if (key === "properties" && value && typeof value === "object") {
+        const props: any = {};
+        for (const [propName, propSchema] of Object.entries(value)) {
+          if (GLMProvider.RESERVED_PROP_NAMES.has(propName)) {
+            console.warn(
+              `⚠️ [GLM] Dropping tool property "${propName}" — GLM's schema parser rejects $-prefixed property names`
+            );
+            continue;
+          }
+          props[propName] = this.sanitizeSchema(propSchema);
+        }
+        out.properties = props;
+      } else if (key === "required" && Array.isArray(value)) {
+        out.required = value.filter(
+          (r) => !GLMProvider.RESERVED_PROP_NAMES.has(r)
+        );
+      } else if (value && typeof value === "object") {
+        // Recurse into items, nested schemas, combinators, $defs, etc.
+        out[key] = this.sanitizeSchema(value);
+      } else {
+        out[key] = value;
+      }
+    }
+    return out;
+  }
+
+  /** Build a GLM-safe function `parameters` object from an MCP inputSchema. */
+  private toGlmParameters(inputSchema: any): any {
+    const sanitized = this.sanitizeSchema(inputSchema) || {};
+    if (sanitized.type !== "object") {
+      sanitized.type = "object";
+    }
+    if (!sanitized.properties || typeof sanitized.properties !== "object") {
+      sanitized.properties = {};
+    }
+    return sanitized;
   }
 
   async generateResponseWithTools(
@@ -41,7 +109,7 @@ export class QwenProvider extends BaseProvider {
     servers: any[]
   ): Promise<AIProviderResponse> {
     console.log(
-      `🟣🛠️ [QWEN TOOLS] Starting call to ${model} with ${tools.length} tools`
+      `🔵🛠️ [GLM TOOLS] Starting call to ${model} with ${tools.length} tools`
     );
 
     this.validateProvider();
@@ -51,17 +119,18 @@ export class QwenProvider extends BaseProvider {
 
     try {
       return await this.withRetry(async () => {
-        // Convert MCP tools to OpenAI function format
+        // Convert MCP tools to OpenAI function format, sanitizing each schema
+        // so GLM's stricter validator doesn't 500 on unsupported keywords.
         const functions = tools.map((tool) => ({
           type: "function",
           function: {
             name: tool.name,
             description: tool.description,
-            parameters: tool.inputSchema || { type: "object", properties: {} },
+            parameters: this.toGlmParameters(tool.inputSchema),
           },
         }));
 
-        console.log(`🔧 [QWEN] Prepared ${functions.length} functions`);
+        console.log(`🔧 [GLM] Prepared ${functions.length} functions`);
 
         const completion = await client.chat.completions.create({
           model,
@@ -76,7 +145,7 @@ export class QwenProvider extends BaseProvider {
         const message = choice?.message;
 
         if (!message) {
-          return { success: false, error: "No response from Qwen" };
+          return { success: false, error: "No response from GLM" };
         }
 
         // Handle tool calls
@@ -85,7 +154,7 @@ export class QwenProvider extends BaseProvider {
 
         if (message.tool_calls && message.tool_calls.length > 0) {
           console.log(
-            `🔨 [QWEN] Executing ${message.tool_calls.length} tool calls`
+            `🔨 [GLM] Executing ${message.tool_calls.length} tool calls`
           );
 
           for (const toolCall of message.tool_calls) {
@@ -100,7 +169,7 @@ export class QwenProvider extends BaseProvider {
                 : null;
 
               if (tool && server) {
-                console.log(`⚙️ [QWEN] Calling tool: ${toolName}`);
+                console.log(`⚙️ [GLM] Calling tool: ${toolName}`);
                 const toolResult = await mcpService.callTool(null, {
                   server,
                   name: toolName,
@@ -116,10 +185,10 @@ export class QwenProvider extends BaseProvider {
                   serverName: server.name,
                 });
 
-                console.log(`✅ [QWEN] Tool executed: ${toolName}`);
+                console.log(`✅ [GLM] Tool executed: ${toolName}`);
               }
             } catch (error) {
-              console.error(`❌ [QWEN] Tool execution failed:`, error);
+              console.error(`❌ [GLM] Tool execution failed:`, error);
               executedToolCalls.push({
                 id: toolCall.id,
                 name: toolCall.function.name,
@@ -141,12 +210,6 @@ export class QwenProvider extends BaseProvider {
             })),
           ];
 
-          console.log(`📝 [QWEN_DEBUG] Making follow-up call with tool results:`, {
-            originalMessageLength: messages.length,
-            toolResultsCount: executedToolCalls.length,
-            hasToolResults: executedToolCalls.some(call => call.result)
-          });
-
           const followUpCompletion = await client.chat.completions.create({
             model,
             messages: toolResultMessages,
@@ -155,20 +218,13 @@ export class QwenProvider extends BaseProvider {
           });
 
           const followUpResponse = followUpCompletion.choices[0]?.message?.content;
-          console.log(`📋 [QWEN_DEBUG] Follow-up response:`, {
-            hasFollowUp: !!followUpResponse,
-            followUpLength: followUpResponse?.length,
-            originalResponse: finalResponse.substring(0, 100),
-            followUpPreview: followUpResponse?.substring(0, 100)
-          });
-
           finalResponse = followUpResponse || finalResponse;
         } else if (finalResponse.includes("<tool_call>")) {
-          // Qwen often emits tool calls as textual <tool_call> XML (following
+          // GLM often emits tool calls as textual <tool_call> XML (following
           // the app's system-prompt format) instead of native tool_calls.
           // Parse and execute those, then summarize so the user sees a
           // formatted answer rather than the raw tool payload.
-          console.log(`🔨 [QWEN] Detected textual <tool_call> emission, parsing via ToolProcessor`);
+          console.log(`🔨 [GLM] Detected textual <tool_call> emission, parsing via ToolProcessor`);
 
           const { toolCalls } = await toolProcessor.processToolCalls(
             finalResponse,
@@ -208,7 +264,7 @@ export class QwenProvider extends BaseProvider {
         }
 
         console.log(
-          `✅ [QWEN TOOLS] Success with ${executedToolCalls.length} tool calls`
+          `✅ [GLM TOOLS] Success with ${executedToolCalls.length} tool calls`
         );
         return {
           success: true,
@@ -217,10 +273,10 @@ export class QwenProvider extends BaseProvider {
         };
       });
     } catch (error) {
-      this.logProviderError('qwen', model, error as Error);
+      this.logProviderError('glm', model, error as Error);
       return {
         success: false,
-        error: `Qwen API error: ${(error as any).message}`,
+        error: `GLM API error: ${(error as any).message}`,
       };
     }
   }

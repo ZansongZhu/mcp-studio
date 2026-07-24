@@ -131,6 +131,8 @@ const ModelSettingsPage: React.FC = () => {
         return "🌊";
       case "qwen":
         return "🔤";
+      case "glm":
+        return "🧠";
       case "ollama":
         return "🦙";
       default:
