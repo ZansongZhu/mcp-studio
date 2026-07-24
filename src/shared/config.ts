@@ -22,7 +22,7 @@ export const AppConfig = {
         timeout: 30000,
       },
       deepseek: {
-        baseUrl: "https://api.deepseek.com/v1",
+        baseUrl: "https://api.deepseek.com",
         maxRetries: 3,
         timeout: 30000,
       },
