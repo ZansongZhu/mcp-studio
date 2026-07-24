@@ -64,20 +64,28 @@ const getDefaultProviders = (): ModelProvider[] => {
       pricing: { input: 0.000435, output: 0.00087 },
     },
     {
-      id: "qwen-max",
-      name: "Qwen Max",
+      id: "qwen3.7-max",
+      name: "Qwen 3.7 Max",
       providerId: "qwen",
-      contextLength: 30000,
-      maxTokens: 2000,
-      pricing: { input: 0.0001, output: 0.0002 },
+      contextLength: 1000000,
+      maxTokens: 8192,
+      pricing: { input: 0.0025, output: 0.0075 },
     },
     {
-      id: "qwen-plus",
-      name: "Qwen Plus",
+      id: "qwen3.7-plus",
+      name: "Qwen 3.7 Plus",
       providerId: "qwen",
-      contextLength: 30000,
-      maxTokens: 2000,
-      pricing: { input: 0.00005, output: 0.0001 },
+      contextLength: 1000000,
+      maxTokens: 8192,
+      pricing: { input: 0.00032, output: 0.00128 },
+    },
+    {
+      id: "glm-5.2",
+      name: "GLM-5.2",
+      providerId: "glm",
+      contextLength: 1000000,
+      maxTokens: 8192,
+      pricing: { input: 0.00093, output: 0.003 },
     },
     {
       id: "gemini-2.5-pro",
@@ -122,9 +130,16 @@ const getDefaultProviders = (): ModelProvider[] => {
     {
       id: "qwen",
       name: "Qwen",
-      baseUrl: "https://dashscope.aliyuncs.com/api/v1",
+      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
       apiKey: "",
       models: defaultModels.filter((m) => m.providerId === "qwen"),
+    },
+    {
+      id: "glm",
+      name: "Zhipu GLM",
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      apiKey: "",
+      models: defaultModels.filter((m) => m.providerId === "glm"),
     },
     {
       id: "gemini",
@@ -169,6 +184,15 @@ const AppInitializer: React.FC = () => {
           const mergedProviders = mergeProviders(defaultProviders, storedProviders);
           dispatch(setProviders(mergedProviders));
           console.log(`Loaded ${mergedProviders.length} providers (${storedProviders.length} stored + ${mergedProviders.length - storedProviders.length} new defaults)`);
+
+          // Persist the merged/migrated providers so the main process AIService
+          // and the store pick up base URL migrations (e.g. Qwen's endpoint).
+          try {
+            await (window as any).api.storage.setModelProviders(mergedProviders);
+            await (window as any).api.ai.updateProviders(mergedProviders);
+          } catch (syncError) {
+            console.error("Failed to sync merged providers to main:", syncError);
+          }
         } else {
           // No stored providers, use defaults
           dispatch(setProviders(defaultProviders));
@@ -205,8 +229,16 @@ const AppInitializer: React.FC = () => {
         console.log(`Adding missing default provider: ${defaultProvider.name}`);
         merged.push(defaultProvider);
       } else {
-        // Remove obsolete models (like llama3.2)
-        const obsoleteModelIds = ['llama3.2'];
+        // Migrate obsolete base URLs to the current default (e.g. Qwen's
+        // native /api/v1 endpoint, which is incompatible with the OpenAI SDK).
+        const obsoleteBaseUrls = ['https://dashscope.aliyuncs.com/api/v1'];
+        if (existingProvider.baseUrl && obsoleteBaseUrls.includes(existingProvider.baseUrl)) {
+          console.log(`Migrating obsolete base URL for ${existingProvider.name}: ${existingProvider.baseUrl} -> ${defaultProvider.baseUrl}`);
+          existingProvider.baseUrl = defaultProvider.baseUrl;
+        }
+
+        // Remove obsolete models (like llama3.2 and retired Qwen tiers)
+        const obsoleteModelIds = ['llama3.2', 'qwen-max', 'qwen-plus'];
         const originalCount = existingProvider.models.length;
         existingProvider.models = existingProvider.models.filter(model => !obsoleteModelIds.includes(model.id));
         if (existingProvider.models.length < originalCount) {
