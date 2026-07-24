@@ -161,10 +161,23 @@ export const useConversation = () => {
         (serverId) => servers.find((s) => s.id === serverId)?.isActive
       );
 
+      // Pin the real model identity so the model doesn't guess its own name /
+      // version from training data (which can be stale or wrong - e.g. a V4 model
+      // that reports "V3", or claiming to be made by another company).
+      const providerName = providers.find(
+        (p) => p.id === conversationModel.providerId
+      )?.name;
+      const identity =
+        `You are ${conversationModel.name}` +
+        (providerName ? `, an AI model provided by ${providerName}` : "") +
+        `. When asked who you are, which company made you, or your version, ` +
+        `answer with exactly this identity - never claim to be a different model or maker. `;
+
       let systemMessage = {
         role: "system" as const,
         content:
-          "You are a helpful assistant. Use tools directly when needed without asking for permission. When you call a tool, ALWAYS interpret and present the returned data in a clear, formatted response. Never show raw tool calls or ask the user to execute them - the tools execute automatically and you should analyze the results. Present financial data in tables, format numbers clearly, and provide meaningful insights from the data. Be concise and execute tools immediately when appropriate data is requested.",
+          identity +
+          "Use tools directly when needed without asking for permission. When you call a tool, ALWAYS interpret and present the returned data in a clear, formatted response. Never show raw tool calls or ask the user to execute them - the tools execute automatically and you should analyze the results. Present financial data in tables, format numbers clearly, and provide meaningful insights from the data. Be concise and execute tools immediately when appropriate data is requested.",
       };
 
       if (activeServerIds.length > 0) {
@@ -201,7 +214,7 @@ export const useConversation = () => {
 
           systemMessage = {
             role: "system" as const,
-            content: `You are a helpful assistant with access to the following tools:\n\n${toolsDescription}\n\nWhen you need to use a tool, format your response like this:\n\n<tool_call>{"serverId": "SERVER_ID", "name": "TOOL_NAME", "args": {...}}</tool_call>\n\nIMPORTANT: SERVER_ID must be one of these available server IDs: ${serverIdsText}. Use the exact server ID shown in parentheses next to each tool name. TOOL_NAME must match exactly one of the available tool names listed above. Provide the necessary arguments in the args object according to the tool's parameter schema.`,
+            content: `${identity}\n\nYou have access to the following tools:\n\n${toolsDescription}\n\nWhen you need to use a tool, format your response like this:\n\n<tool_call>{"serverId": "SERVER_ID", "name": "TOOL_NAME", "args": {...}}</tool_call>\n\nIMPORTANT: SERVER_ID must be one of these available server IDs: ${serverIdsText}. Use the exact server ID shown in parentheses next to each tool name. TOOL_NAME must match exactly one of the available tool names listed above. Provide the necessary arguments in the args object according to the tool's parameter schema.`,
           };
         }
       }
