@@ -177,6 +177,3 @@ MIT License
 
 Copyright (c) 2025 MCP Studio
 
-0d3d2ce781594510ac683973b760a320.7QhxouWeehh89Pyv
-
-sk-ea621fa527914f459885307f5767e260
