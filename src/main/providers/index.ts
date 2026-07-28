@@ -5,6 +5,7 @@ import { GeminiProvider } from "./GeminiProvider";
 import { DeepSeekProvider } from "./DeepSeekProvider";
 import { QwenProvider } from "./QwenProvider";
 import { GLMProvider } from "./GLMProvider";
+import { KimiProvider } from "./KimiProvider";
 import { OllamaProvider } from "./OllamaProvider";
 
 export { OpenAIProvider } from "./OpenAIProvider";
@@ -13,6 +14,7 @@ export { GeminiProvider } from "./GeminiProvider";
 export { DeepSeekProvider } from "./DeepSeekProvider";
 export { QwenProvider } from "./QwenProvider";
 export { GLMProvider } from "./GLMProvider";
+export { KimiProvider } from "./KimiProvider";
 export { OllamaProvider } from "./OllamaProvider";
 
 export class ProviderFactory {
@@ -30,6 +32,8 @@ export class ProviderFactory {
         return new QwenProvider(provider);
       case "glm":
         return new GLMProvider(provider);
+      case "kimi":
+        return new KimiProvider(provider);
       case "ollama":
         return new OllamaProvider(provider);
       default:
@@ -38,6 +42,6 @@ export class ProviderFactory {
   }
 
   static getSupportedProviders(): string[] {
-    return ["openai", "anthropic", "gemini", "deepseek", "qwen", "glm", "ollama"];
+    return ["openai", "anthropic", "gemini", "deepseek", "qwen", "glm", "kimi", "ollama"];
   }
 }

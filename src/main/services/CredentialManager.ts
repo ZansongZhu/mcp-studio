@@ -257,6 +257,7 @@ export class CredentialManager {
       deepseek: /^sk-[A-Za-z0-9]{48,}$/,
       qwen: /^sk-[A-Za-z0-9]{20,}$/,
       glm: /^[A-Za-z0-9]+\.[A-Za-z0-9]+$/,
+      kimi: /^sk-[A-Za-z0-9]{48,}$/,
     };
 
     const rule = validationRules[providerId as keyof typeof validationRules];

@@ -281,6 +281,10 @@ export function validateApiKey(providerId: string, apiKey: string): ValidationRe
       pattern: /^sk-[A-Za-z0-9]{48,}$/,
       description: 'DeepSeek API key must start with sk- followed by at least 48 characters',
     },
+    kimi: {
+      pattern: /^sk-[A-Za-z0-9]{48,}$/,
+      description: 'Kimi API key must start with sk- followed by at least 48 characters',
+    },
   };
 
   const rule = validationRules[providerId];

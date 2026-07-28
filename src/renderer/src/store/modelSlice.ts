@@ -90,6 +90,22 @@ const defaultModels: AIModel[] = [
     pricing: { input: 0.00093, output: 0.003 },
   },
   {
+    id: "kimi-k3",
+    name: "Kimi K3",
+    providerId: "kimi",
+    contextLength: 1000000,
+    maxTokens: 131072,
+    pricing: { input: 0.003, output: 0.015 },
+  },
+  {
+    id: "kimi-k2.7-code-highspeed",
+    name: "Kimi K2.7 Code Highspeed",
+    providerId: "kimi",
+    contextLength: 256000,
+    maxTokens: 8192,
+    pricing: { input: 0.001, output: 0.004 },
+  },
+  {
     id: "gemini-2.5-pro",
     name: "Gemini 2.5 Pro",
     providerId: "gemini",
@@ -149,6 +165,13 @@ const defaultProviders: ModelProvider[] = [
     baseUrl: "https://open.bigmodel.cn/api/paas/v4",
     apiKey: "",
     models: defaultModels.filter((m) => m.providerId === "glm"),
+  },
+  {
+    id: "kimi",
+    name: "Kimi (Moonshot)",
+    baseUrl: "https://api.moonshot.ai/v1",
+    apiKey: "",
+    models: defaultModels.filter((m) => m.providerId === "kimi"),
   },
   {
     id: "gemini",

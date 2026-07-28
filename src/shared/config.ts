@@ -36,6 +36,11 @@ export const AppConfig = {
         maxRetries: 3,
         timeout: 30000,
       },
+      kimi: {
+        baseUrl: "https://api.moonshot.ai/v1",
+        maxRetries: 3,
+        timeout: 30000,
+      },
     },
   },
   mcp: {
