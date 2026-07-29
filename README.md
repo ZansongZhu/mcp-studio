@@ -177,4 +177,12 @@ MIT License
 
 Copyright (c) 2025 MCP Studio
 
+export ANTHROPIC_BASE_URL="https://api.kimi.com/coding/"
+export ANTHROPIC_API_KEY=sk-9cbWx7z6zuVajcD0wGR9m5U96rdXmn6bcM9N48ma3vj4tFje7mamsC6BCjjO25J0
+export ANTHROPIC_MODEL="kimi-for-coding"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="kimi-for-coding"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="kimi-for-coding"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="kimi-for-coding"
+export CLAUDE_CODE_SUBAGENT_MODEL="kimi-for-coding"
+export ENABLE_TOOL_SEARCH="false"
 
